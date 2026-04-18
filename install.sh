@@ -2,7 +2,7 @@
 # ============================================================
 #  LoadBalancer Pro - Full Installer v2.4.2
 #  Ubuntu 22.04 LTS | PHP 8.1 | MySQL 8.0 | Nginx | Redis
-#  FIXED: schema key word conflict + skey column
+#  كل الإعدادات ثابتة — بدون أسئلة
 # ============================================================
 set -e
 
@@ -14,6 +14,20 @@ info() { echo -e "${CYAN}[i]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 step() { echo -e "\n${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n    $1\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"; }
+
+# ============================================================
+#  ⚙️  الإعدادات الثابتة — عدّل هنا فقط
+# ============================================================
+DB_USER="lbpro"
+DB_PASS="admin123"
+DB_NAME="lbpro_db"
+ADMIN_PASS="admin123"
+PHP_VER="8.1"
+INSTALL_DIR="/var/www/lbpro"
+GITHUB_ZIP="https://codeload.github.com/moryante1/lbpro/zip/refs/heads/main"
+DOMAIN=$(hostname -I | awk '{print $1}')
+JWT_SECRET=$(openssl rand -hex 32)
+# ============================================================
 
 clear
 echo -e "${CYAN}"
@@ -28,37 +42,20 @@ echo -e "${NC}"
 echo -e "${BOLD}  LoadBalancer Pro — Full Installer v2.4.2${NC}"
 echo -e "  Ubuntu 22.04 LTS | PHP 8.1 | MySQL 8.0 | Nginx | Redis"
 echo -e "  ${CYAN}github.com/moryante1/lbpro${NC}\n"
+echo -e "  ${BOLD}┌─ الإعدادات الثابتة ────────────────────────┐${NC}"
+echo -e "  │  IP الخادم    : ${CYAN}${DOMAIN}${NC}"
+echo -e "  │  مجلد التثبيت: ${CYAN}${INSTALL_DIR}${NC}"
+echo -e "  │  قاعدة البيانات: ${CYAN}${DB_NAME}${NC}"
+echo -e "  │  مستخدم MySQL : ${CYAN}${DB_USER}${NC}"
+echo -e "  │  كلمة المرور  : ${CYAN}${DB_PASS}${NC}"
+echo -e "  │  كلمة مرور Admin: ${CYAN}${ADMIN_PASS}${NC}"
+echo -e "  │  PHP          : ${CYAN}${PHP_VER}${NC}"
+echo -e "  ${BOLD}└────────────────────────────────────────────┘${NC}\n"
 
 [[ $EUID -ne 0 ]] && err "شغّل كـ root: sudo bash install.sh"
 
-# ============================================================
-step "إعداد التثبيت"
-# ============================================================
-DEFAULT_IP=$(hostname -I | awk '{print $1}')
-read -p "  IP أو نطاق الخادم [${DEFAULT_IP}]: " DOMAIN
-DOMAIN=${DOMAIN:-$DEFAULT_IP}
-
-read -p "  مستخدم MySQL [lbpro]: " DB_USER
-DB_USER=${DB_USER:-lbpro}
-
-read -s -p "  كلمة مرور MySQL (Enter = تلقائي): " DB_PASS; echo
-[ -z "$DB_PASS" ] && DB_PASS=$(openssl rand -base64 18 | tr -d '=/+' | head -c 20) \
-  && warn "كلمة المرور التلقائية: ${BOLD}${DB_PASS}${NC}"
-
-read -p "  اسم قاعدة البيانات [lbpro_db]: " DB_NAME
-DB_NAME=${DB_NAME:-lbpro_db}
-
-read -s -p "  كلمة مرور admin (Enter = تلقائي): " ADMIN_PASS; echo
-[ -z "$ADMIN_PASS" ] && ADMIN_PASS=$(openssl rand -base64 12 | tr -d '=/+' | head -c 14) \
-  && warn "كلمة مرور Admin: ${BOLD}${ADMIN_PASS}${NC}"
-
-INSTALL_DIR="/var/www/lbpro"
-JWT_SECRET=$(openssl rand -hex 32)
-PHP_VER="8.1"
-GITHUB_ZIP="https://codeload.github.com/moryante1/lbpro/zip/refs/heads/main"
-
-echo -e "\n  ${BOLD}ملخص:${NC} IP=${CYAN}${DOMAIN}${NC} | DB=${CYAN}${DB_NAME}${NC} | PHP=${CYAN}${PHP_VER}${NC}\n"
-read -p "  متابعة؟ [Y/n]: " C; [[ "${C,,}" == "n" ]] && exit 0
+read -p "  متابعة؟ [Y/n]: " C
+[[ "${C,,}" == "n" ]] && exit 0
 
 # ============================================================
 step "1/9 — تحديث النظام"
@@ -117,7 +114,7 @@ CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost'
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL
-ok "قاعدة البيانات: ${DB_NAME}"
+ok "قاعدة البيانات: ${DB_NAME} | مستخدم: ${DB_USER}"
 
 # ============================================================
 step "6/9 — تحميل الملفات من GitHub"
@@ -125,7 +122,7 @@ step "6/9 — تحميل الملفات من GitHub"
 TMP_ZIP="/tmp/lbpro_main.zip"
 TMP_DIR="/tmp/lbpro_src"
 
-info "جاري التحميل..."
+info "جاري التحميل من GitHub..."
 wget -q --show-progress -O "${TMP_ZIP}" "${GITHUB_ZIP}" \
   || curl -sL "${GITHUB_ZIP}" -o "${TMP_ZIP}" \
   || err "فشل التحميل — تحقق من الإنترنت"
@@ -146,8 +143,6 @@ ok "تم نسخ الملفات إلى ${INSTALL_DIR}"
 # ============================================================
 step "7/9 — ملف الإعدادات + قاعدة البيانات"
 # ============================================================
-
-# config.php
 cat > "${INSTALL_DIR}/config/config.php" << PHPCONF
 <?php
 define('APP_NAME',    'LoadBalancer Pro');
@@ -181,7 +176,7 @@ define('REDIS_PORT',  6379);
 PHPCONF
 ok "config.php"
 
-# ---- schema.sql (مدمج مباشرة في install.sh لضمان الصحة) ----
+# ---- قاعدة البيانات مدمجة (بدون ملف خارجي) ----
 mysql -u root "${DB_NAME}" << 'SCHEMA'
 SET NAMES utf8mb4;
 SET foreign_key_checks = 0;
@@ -391,7 +386,7 @@ INSERT IGNORE INTO `interfaces` (`name`,`display_name`,`type`,`weight`,`status`)
 
 SET foreign_key_checks = 1;
 SCHEMA
-ok "تم استيراد قاعدة البيانات بنجاح"
+ok "تم استيراد قاعدة البيانات"
 
 # ---- مستخدم admin ----
 ADMIN_HASH=$(php${PHP_VER} -r "echo password_hash('${ADMIN_PASS}', PASSWORD_BCRYPT, ['cost'=>12]);")
@@ -400,10 +395,10 @@ INSERT INTO users (username,password_hash,role,email,created_at)
 VALUES ('admin','${ADMIN_HASH}','superadmin','admin@lbpro.local',NOW())
 ON DUPLICATE KEY UPDATE password_hash='${ADMIN_HASH}';
 ADMINSQL
-ok "مستخدم admin"
+ok "مستخدم admin (كلمة المرور: ${ADMIN_PASS})"
 
 # ============================================================
-step "8/9 — Nginx"
+step "8/9 — Nginx + PHP-FPM"
 # ============================================================
 cat > /etc/nginx/sites-available/lbpro << NGINX
 server {
@@ -459,7 +454,6 @@ ln -sf /etc/nginx/sites-available/lbpro /etc/nginx/sites-enabled/lbpro
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && ok "Nginx config صحيح" || err "خطأ Nginx — راجع: sudo nginx -t"
 
-# PHP-FPM tuning
 PHP_INI="/etc/php/${PHP_VER}/fpm/php.ini"
 [ -f "$PHP_INI" ] && {
   sed -i 's/^;*upload_max_filesize.*/upload_max_filesize = 50M/'  "$PHP_INI"
@@ -518,23 +512,23 @@ HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null || e
   && STATUS="${GREEN}✔ يعمل (HTTP ${HTTP})${NC}" \
   || STATUS="${YELLOW}⚠ HTTP ${HTTP} — تحقق: tail -f /var/log/nginx/lbpro_error.log${NC}"
 
+# ============================================================
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}${BOLD}  ✔  تم التثبيت بنجاح — LoadBalancer Pro v2.4.2${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  🌐 الرابط    : ${CYAN}http://${DOMAIN}${NC}"
-echo -e "  👤 المستخدم  : ${BOLD}admin${NC}"
-echo -e "  🔑 كلمة المرور: ${RED}${BOLD}${ADMIN_PASS}${NC}  ← احفظها!"
+echo -e "  🌐 الرابط     : ${CYAN}http://${DOMAIN}${NC}"
+echo -e "  👤 المستخدم   : ${BOLD}admin${NC}"
+echo -e "  🔑 كلمة المرور: ${RED}${BOLD}${ADMIN_PASS}${NC}"
 echo ""
-echo -e "  🗄  MySQL    : ${DB_NAME} | ${DB_USER} | ${RED}${DB_PASS}${NC}"
-echo -e "  🔧 PHP       : ${PHP_VER}-FPM"
-echo -e "  📡 الموقع    : $(echo -e $STATUS)"
+echo -e "  🗄  MySQL     : ${DB_NAME} | ${DB_USER} | ${DB_PASS}"
+echo -e "  🔧 PHP        : ${PHP_VER}-FPM"
+echo -e "  📡 الموقع     : $(echo -e $STATUS)"
 echo ""
 echo -e "  📋 أوامر مفيدة:"
 echo -e "     tail -f ${INSTALL_DIR}/logs/system.log"
 echo -e "     tail -f /var/log/nginx/lbpro_error.log"
 echo -e "     sudo systemctl status nginx php${PHP_VER}-fpm mysql"
 echo ""
-echo -e "  ${YELLOW}${BOLD}⚠  احفظ كلمات المرور في مكان آمن!${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
